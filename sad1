@@ -1,0 +1,2 @@
+adb shell setprop debug.layout true; adb shell service call activity 1599295570
+adb shell setprop debug.layout false; adb shell service call activity 1599295570
