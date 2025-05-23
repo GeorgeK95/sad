@@ -1,0 +1,27 @@
+Box(
+    modifier = Modifier
+        .height(80.dp) // visible area height
+        .fillMaxWidth()
+        .clipToBounds() // <== THIS is key
+        .background(Color.LightGray) // for visibility
+) {
+    // Top visible content
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Blue),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text("VISIBLE", color = Color.White)
+    }
+
+    // This content is offset and should be clipped
+    Column(
+        modifier = Modifier
+            .offset(y = 40.dp) // overlaps the Row, but gets clipped
+            .background(Color.Red)
+    ) {
+        Text("SHOULD BE HIDDEN", color = Color.White)
+    }
+}
