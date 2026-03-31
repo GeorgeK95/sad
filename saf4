@@ -1,0 +1,510 @@
+@file:Suppress("unused")
+
+package com.example.momentum
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+private val Bg = Color(0xFF0B0B0D)
+private val CardBg = Color(0xFF1A1B1E)
+private val SurfaceBg = Color(0xFF232427)
+private val Grid = Color(0xFF3A3C40)
+private val TextPrimary = Color(0xFFF5F5F5)
+private val TextSecondary = Color(0xFFAAAAAA)
+private val AccentGreen = Color(0xFF3EF3C5)
+private val RedBar = Color(0xFFE11414)
+private val GrayBar = Color(0xFF595959)
+private val Danger = Color(0xFFFF6B6B)
+private val Blue = Color(0xFF6E86FF)
+
+enum class EventType {
+    GOAL,
+    OWN_GOAL,
+    PENALTY_GOAL,
+    PENALTY_MISS,
+    RED_CARD,
+    SUBSTITUTION
+}
+
+data class MomentumEvent(
+    val minute: Float,
+    val level: Float, // + is home, - is away
+    val type: EventType
+)
+
+@Composable
+fun MomentumScreen(
+    modifier: Modifier = Modifier
+) {
+    val topBars = listOf(0.55f, 0.0f, 0.62f, 0.0f, 0.68f, 0.0f, 0.60f, 0.0f, 0.57f, 0.0f, 0.52f)
+    val bottomBars = listOf(0.0f, 0.28f, 0.0f, 0.35f, 0.0f, 0.22f, 0.0f, 0.0f, 0.30f, 0.0f, 0.0f)
+
+    val events = listOf(
+        MomentumEvent(5f, -0.42f, EventType.GOAL),
+        MomentumEvent(12f, 0.38f, EventType.GOAL),
+        MomentumEvent(18f, -0.40f, EventType.GOAL),
+        MomentumEvent(36f, 0.40f, EventType.RED_CARD),
+        MomentumEvent(36f, 0.22f, EventType.GOAL),
+        MomentumEvent(44f, 0.62f, EventType.GOAL),
+        MomentumEvent(53f, 0.18f, EventType.SUBSTITUTION),
+        MomentumEvent(70f, -0.48f, EventType.PENALTY_MISS),
+        MomentumEvent(86f, -0.38f, EventType.GOAL),
+        MomentumEvent(88f, -0.58f, EventType.GOAL),
+        MomentumEvent(90f, -0.72f, EventType.SUBSTITUTION),
+        MomentumEvent(92f, -0.90f, EventType.OWN_GOAL)
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Bg)
+            .padding(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CardBg, RoundedCornerShape(24.dp))
+                .padding(16.dp)
+        ) {
+            Column {
+                Header()
+                Spacer(Modifier.height(18.dp))
+                TeamsRow()
+                Spacer(Modifier.height(18.dp))
+                MomentumChart(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.95f),
+                    topBars = topBars,
+                    bottomBars = bottomBars,
+                    events = events
+                )
+                Spacer(Modifier.height(16.dp))
+                Legend()
+            }
+        }
+    }
+}
+
+@Composable
+private fun Header() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Momentum",
+                color = TextPrimary,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Minute-by-minute pressure + incident overlay",
+                color = TextSecondary,
+                fontSize = 14.sp
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .background(SurfaceBg, RoundedCornerShape(20.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(AccentGreen, CircleShape)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "90+5'",
+                    color = TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeamsRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TeamBlock(
+            modifier = Modifier.weight(1f),
+            badgeColor = Color(0xFFD81E1E),
+            badgeText = "NOB",
+            teamName = "Newell's",
+            side = "Home",
+            alignStart = true
+        )
+
+        TeamBlock(
+            modifier = Modifier.weight(1f),
+            badgeColor = Color(0xFFBDBDBD),
+            badgeText = "",
+            teamName = "CA Acassuso",
+            side = "Away",
+            alignStart = false
+        )
+    }
+}
+
+@Composable
+private fun TeamBlock(
+    modifier: Modifier,
+    badgeColor: Color,
+    badgeText: String,
+    teamName: String,
+    side: String,
+    alignStart: Boolean
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = if (alignStart) Arrangement.Start else Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (alignStart) {
+            TeamBadge(badgeColor, badgeText)
+            Spacer(Modifier.width(12.dp))
+        }
+
+        Column(horizontalAlignment = if (alignStart) Alignment.Start else Alignment.End) {
+            Text(
+                text = teamName,
+                color = TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = side,
+                color = TextSecondary,
+                fontSize = 14.sp
+            )
+        }
+
+        if (!alignStart) {
+            Spacer(Modifier.width(12.dp))
+            TeamBadge(badgeColor, badgeText)
+        }
+    }
+}
+
+@Composable
+private fun TeamBadge(
+    color: Color,
+    text: String
+) {
+    Box(
+        modifier = Modifier
+            .size(width = 40.dp, height = 48.dp)
+            .background(color, RoundedCornerShape(10.dp))
+            .border(2.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (text.isNotBlank()) {
+            Text(
+                text = text,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun MomentumChart(
+    modifier: Modifier,
+    topBars: List<Float>,
+    bottomBars: List<Float>,
+    events: List<MomentumEvent>
+) {
+    Box(
+        modifier = modifier
+            .background(SurfaceBg, RoundedCornerShape(24.dp))
+            .padding(12.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val midY = h * 0.53f
+            val leftPad = 18.dp.toPx()
+            val rightPad = 10.dp.toPx()
+            val topPad = 20.dp.toPx()
+            val bottomPad = 18.dp.toPx()
+
+            val chartW = w - leftPad - rightPad
+            val chartTop = topPad
+            val chartBottom = h - bottomPad
+            val chartH = chartBottom - chartTop
+
+            val dashed = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+
+            val minuteMarks = listOf(15, 30, 45, 60, 75, 90)
+            minuteMarks.forEach { minute ->
+                val x = leftPad + chartW * (minute / 95f)
+                drawLine(
+                    color = Grid,
+                    start = Offset(x, chartTop),
+                    end = Offset(x, chartBottom),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            val horizontalLevels = listOf(0.22f, 0.53f, 0.84f)
+            horizontalLevels.forEach { yFactor ->
+                val y = chartTop + chartH * yFactor
+                drawLine(
+                    color = Grid,
+                    start = Offset(leftPad, y),
+                    end = Offset(leftPad + chartW, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            drawLine(
+                color = Grid,
+                start = Offset(leftPad, midY),
+                end = Offset(leftPad + chartW, midY),
+                strokeWidth = 2.dp.toPx()
+            )
+
+            val groupCount = topBars.size
+            val barGroupWidth = chartW / groupCount
+            val barWidth = barGroupWidth * 0.72f
+            val segmentCount = 7
+
+            topBars.forEachIndexed { index, magnitude ->
+                if (magnitude > 0f) {
+                    val x = leftPad + index * barGroupWidth + (barGroupWidth - barWidth) / 2f
+                    val totalHeight = magnitude * (midY - chartTop) * 0.92f
+                    val segmentHeight = totalHeight / segmentCount
+                    repeat(segmentCount) { seg ->
+                        val segW = barWidth * (1f - seg * 0.08f)
+                        val segX = x + (barWidth - segW) / 2f
+                        val segY = midY - (seg + 1) * segmentHeight
+                        drawRoundRect(
+                            color = RedBar,
+                            topLeft = Offset(segX, segY),
+                            size = Size(segW, segmentHeight - 2.dp.toPx()),
+                            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                        )
+                    }
+                }
+            }
+
+            bottomBars.forEachIndexed { index, magnitude ->
+                if (magnitude > 0f) {
+                    val x = leftPad + index * barGroupWidth + (barGroupWidth - barWidth) / 2f
+                    val totalHeight = magnitude * (chartBottom - midY) * 0.92f
+                    val segmentHeight = totalHeight / segmentCount
+                    repeat(segmentCount) { seg ->
+                        val segW = barWidth * (1f - seg * 0.08f)
+                        val segX = x + (barWidth - segW) / 2f
+                        val segY = midY + seg * segmentHeight
+                        drawRoundRect(
+                            color = GrayBar,
+                            topLeft = Offset(segX, segY),
+                            size = Size(segW, segmentHeight - 2.dp.toPx()),
+                            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                        )
+                    }
+                }
+            }
+
+            drawRoundRect(
+                color = AccentGreen,
+                topLeft = Offset(leftPad + chartW - 3.dp.toPx(), chartTop),
+                size = Size(3.dp.toPx(), chartBottom - chartTop),
+                cornerRadius = CornerRadius(12f, 12f)
+            )
+
+            drawRoundRect(
+                color = AccentGreen,
+                topLeft = Offset(leftPad + chartW - 70.dp.toPx(), chartTop),
+                size = Size(60.dp.toPx(), 28.dp.toPx()),
+                cornerRadius = CornerRadius(20.dp.toPx(), 20.dp.toPx())
+            )
+
+            events.forEach { event ->
+                val x = leftPad + chartW * (event.minute / 95f)
+                val y = midY - ((midY - chartTop) * event.level.coerceIn(-1f, 1f) * 0.9f)
+
+                val bgColor = when (event.type) {
+                    EventType.GOAL, EventType.PENALTY_GOAL -> Color(0xFF1F8F74)
+                    EventType.OWN_GOAL, EventType.PENALTY_MISS, EventType.RED_CARD -> Color(0xFF7A3B3B)
+                    EventType.SUBSTITUTION -> Color(0xFF4D5E93)
+                }
+
+                drawRoundRect(
+                    color = bgColor,
+                    topLeft = Offset(x - 16.dp.toPx(), y - 12.dp.toPx()),
+                    size = Size(32.dp.toPx(), 24.dp.toPx()),
+                    cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                )
+
+                val icon = when (event.type) {
+                    EventType.GOAL -> "⚽"
+                    EventType.OWN_GOAL -> "🥅"
+                    EventType.PENALTY_GOAL -> "⚽"
+                    EventType.PENALTY_MISS -> "❌"
+                    EventType.RED_CARD -> "🟥"
+                    EventType.SUBSTITUTION -> "🔄"
+                }
+
+                drawContext.canvas.nativeCanvas.apply {
+                    drawText(
+                        icon,
+                        x,
+                        y + 6.dp.toPx(),
+                        android.graphics.Paint().apply {
+                            color = android.graphics.Color.WHITE
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            textSize = 14.sp.toPx()
+                            isAntiAlias = true
+                        }
+                    )
+                }
+            }
+
+            drawRoundRect(
+                color = Color(0xFFA21212),
+                topLeft = Offset(leftPad + chartW * (44f / 95f) - 18.dp.toPx(), midY - 10.dp.toPx()),
+                size = Size(36.dp.toPx(), 24.dp.toPx()),
+                cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
+            )
+
+            drawContext.canvas.nativeCanvas.apply {
+                val smallPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.parseColor("#EDEDED")
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    textSize = 14.sp.toPx()
+                    isAntiAlias = true
+                    isFakeBoldText = true
+                }
+
+                minuteMarks.forEach { minute ->
+                    val x = leftPad + chartW * (minute / 95f)
+                    drawText(
+                        if (minute == 90) "90+5'" else "$minute'",
+                        x,
+                        chartTop - 6.dp.toPx(),
+                        smallPaint
+                    )
+                }
+
+                drawText(
+                    "HT",
+                    leftPad + chartW * (45f / 95f),
+                    midY + 7.dp.toPx(),
+                    smallPaint
+                )
+            }
+
+            drawRoundRect(
+                color = Grid.copy(alpha = 0.5f),
+                topLeft = Offset(leftPad, chartTop),
+                size = Size(chartW, chartBottom - chartTop),
+                cornerRadius = CornerRadius(22.dp.toPx(), 22.dp.toPx()),
+                style = Stroke(width = 1.dp.toPx(), pathEffect = dashed)
+            )
+        }
+    }
+}
+
+@Composable
+private fun Legend() {
+    val items = listOf(
+        "⚽ Goal" to null,
+        "🥅 Own Goal" to null,
+        "⚽ Penalty goal" to AccentGreen,
+        "❌ Penalty miss" to AccentGreen,
+        "🟥 Red card" to null,
+        "🔄 Substitution" to null
+    )
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items.forEach { (label, underlineColor) ->
+            LegendChip(label, underlineColor)
+        }
+    }
+}
+
+@Composable
+private fun LegendChip(
+    text: String,
+    underlineColor: Color?
+) {
+    Column {
+        Box(
+            modifier = Modifier
+                .background(SurfaceBg, RoundedCornerShape(50))
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = text,
+                color = TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        if (underlineColor != null) {
+            Spacer(
+                modifier = Modifier
+                    .padding(horizontal = 18.dp)
+                    .height(2.dp)
+                    .fillMaxWidth()
+                    .background(underlineColor, RoundedCornerShape(10.dp))
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0B0D)
+@Composable
+private fun MomentumScreenPreview() {
+    MomentumScreen()
+}
