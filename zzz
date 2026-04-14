@@ -1,0 +1,428 @@
+@file:Suppress("MagicNumber")
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
+
+private val BgOuter = Color(0xFF111A45)
+private val BgInner = Color(0xFF1A214D)
+private val GridColor = Color(0xFF46507E).copy(alpha = 0.45f)
+private val BaselineColor = Color(0xFF7C87B9).copy(alpha = 0.55f)
+private val CyanTop = Color(0xFF61F5FF)
+private val CyanBottom = Color(0xFF2FA8FF)
+private val DipColor = Color(0xFF94A0C7).copy(alpha = 0.55f)
+private val LiveLine = Color(0xFF7BFFC9)
+private val LiveBubble = Color(0xFF7BFFC9)
+private val LabelColor = Color(0xFFDCE6FF)
+
+enum class EventType { GOAL, CARD, VAR, INFO }
+
+data class MomentumEvent(
+    val minute: Int,
+    val side: Side,
+    val row: Int,
+    val type: EventType,
+    val extraText: String? = null
+)
+
+enum class Side { TOP, BOTTOM }
+
+@Composable
+fun MomentumChart(
+    modifier: Modifier = Modifier,
+    maxMinute: Int = 90,
+    liveMinute: Int = 68,
+    topPeaks: List<Int> = listOf(12, 12, 13, 12),
+    bottomDips: List<Int> = listOf(4, 3, 4),
+    events: List<MomentumEvent> = sampleMomentumEvents()
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(BgOuter)
+    ) {
+        var widthPx = 0
+        var heightPx = 0
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(24.dp))
+                .background(BgInner)
+                .onSizeChanged {
+                    widthPx = it.width
+                    heightPx = it.height
+                }
+        ) {
+            val leftPad = 24.dp.toPx()
+            val rightPad = 24.dp.toPx()
+            val topPad = 42.dp.toPx()
+            val bottomPad = 32.dp.toPx()
+
+            val chartLeft = leftPad
+            val chartRight = size.width - rightPad
+            val chartTop = topPad
+            val chartBottom = size.height - bottomPad
+            val chartWidth = chartRight - chartLeft
+            val chartHeight = chartBottom - chartTop
+            val baselineY = chartTop + chartHeight * 0.52f
+
+            drawGrid(
+                chartLeft = chartLeft,
+                chartRight = chartRight,
+                chartTop = chartTop,
+                chartBottom = chartBottom,
+                maxMinute = maxMinute
+            )
+
+            // baseline
+            drawLine(
+                color = BaselineColor,
+                start = Offset(chartLeft, baselineY),
+                end = Offset(chartRight, baselineY),
+                strokeWidth = 2.dp.toPx()
+            )
+
+            drawTopMomentumMountains(
+                chartLeft = chartLeft,
+                chartWidth = chartWidth,
+                baselineY = baselineY,
+                topPeaks = topPeaks
+            )
+
+            drawBottomDips(
+                chartLeft = chartLeft,
+                chartWidth = chartWidth,
+                baselineY = baselineY,
+                bottomDips = bottomDips
+            )
+
+            // halftime band
+            val htX = minuteToX(45f, chartLeft, chartWidth, maxMinute)
+            drawRect(
+                color = Color.White.copy(alpha = 0.08f),
+                topLeft = Offset(htX - 6.dp.toPx(), chartTop),
+                size = Size(12.dp.toPx(), chartBottom - chartTop)
+            )
+
+            // live vertical line
+            val liveX = minuteToX(liveMinute.toFloat(), chartLeft, chartWidth, maxMinute)
+            drawLine(
+                color = LiveLine,
+                start = Offset(liveX, chartTop),
+                end = Offset(liveX, chartBottom),
+                strokeWidth = 3.dp.toPx()
+            )
+        }
+
+        // top minute labels
+        listOf(15, 30, 45, 60, 75, 90).forEach { minute ->
+            MinuteLabel(
+                minute = "$minute'",
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset {
+                        val leftPad = 24.dp.roundToPx()
+                        val rightPad = 24.dp.roundToPx()
+                        val available = widthPx - leftPad - rightPad
+                        val x = leftPad + (available * (minute / 90f))
+                        IntOffset(x.roundToInt() - 18.dp.roundToPx(), 10.dp.roundToPx())
+                    }
+            )
+        }
+
+        LiveMinuteBubble(
+            text = "$liveMinute'",
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset {
+                    val leftPad = 24.dp.roundToPx()
+                    val rightPad = 24.dp.roundToPx()
+                    val available = widthPx - leftPad - rightPad
+                    val x = leftPad + (available * (liveMinute / 90f))
+                    IntOffset(x.roundToInt() - 26.dp.roundToPx(), 10.dp.roundToPx())
+                }
+        )
+
+        // HT label
+        Text(
+            text = "HT",
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = (-8).dp)
+        )
+
+        // event pills
+        events.forEach { event ->
+            EventPill(
+                event = event,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset {
+                        val leftPad = 24.dp.roundToPx()
+                        val rightPad = 24.dp.roundToPx()
+                        val topPad = 42.dp.roundToPx()
+                        val bottomPad = 32.dp.roundToPx()
+                        val chartWidth = widthPx - leftPad - rightPad
+                        val chartHeight = heightPx - topPad - bottomPad
+                        val baselineY = topPad + (chartHeight * 0.52f)
+
+                        val x = leftPad + (chartWidth * (event.minute / 90f))
+                        val y = when (event.side) {
+                            Side.TOP -> baselineY - (event.row * 40.dp.roundToPx())
+                            Side.BOTTOM -> baselineY + (event.row * 40.dp.roundToPx())
+                        }
+
+                        IntOffset(
+                            x.roundToInt() - 20.dp.roundToPx(),
+                            y.roundToInt() - 14.dp.roundToPx()
+                        )
+                    }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MinuteLabel(minute: String, modifier: Modifier = Modifier) {
+    Text(
+        text = minute,
+        color = LabelColor,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun LiveMinuteBubble(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(LiveBubble)
+    ) {
+        Text(
+            text = text,
+            color = Color(0xFF0A2540),
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            modifier = Modifier
+                .offset(y = (-1).dp)
+                .background(Color.Transparent)
+                .paddingHorizontalSafe(14.dp, 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun EventPill(
+    event: MomentumEvent,
+    modifier: Modifier = Modifier
+) {
+    val bg = when (event.type) {
+        EventType.GOAL -> Color(0xFF6FFFD0).copy(alpha = 0.95f)
+        EventType.CARD -> Color(0xFFFF6D7B).copy(alpha = 0.95f)
+        EventType.VAR -> Color(0xFF6AA6FF).copy(alpha = 0.95f)
+        EventType.INFO -> Color(0xFF6AA6FF).copy(alpha = 0.95f)
+    }
+
+    val symbol = when (event.type) {
+        EventType.GOAL -> "⚽"
+        EventType.CARD -> "🟥"
+        EventType.VAR -> "↕"
+        EventType.INFO -> "?"
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg)
+    ) {
+        Text(
+            text = event.extraText ?: symbol,
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.paddingHorizontalSafe(10.dp, 6.dp)
+        )
+    }
+}
+
+private fun DrawScope.drawGrid(
+    chartLeft: Float,
+    chartRight: Float,
+    chartTop: Float,
+    chartBottom: Float,
+    maxMinute: Int
+) {
+    val chartWidth = chartRight - chartLeft
+    val chartHeight = chartBottom - chartTop
+
+    // outer frame
+    drawRoundRect(
+        color = GridColor,
+        topLeft = Offset(chartLeft, chartTop),
+        size = Size(chartWidth, chartHeight),
+        cornerRadius = CornerRadius(20.dp.toPx(), 20.dp.toPx()),
+        style = Stroke(width = 1.dp.toPx())
+    )
+
+    // vertical grid every 15 min
+    for (m in 15 until maxMinute step 15) {
+        val x = minuteToX(m.toFloat(), chartLeft, chartWidth, maxMinute)
+        drawLine(
+            color = GridColor,
+            start = Offset(x, chartTop),
+            end = Offset(x, chartBottom),
+            strokeWidth = 1.dp.toPx()
+        )
+    }
+
+    // few horizontal guide lines
+    val rows = 4
+    repeat(rows - 1) { index ->
+        val y = chartTop + (chartHeight / rows) * (index + 1)
+        drawLine(
+            color = GridColor,
+            start = Offset(chartLeft, y),
+            end = Offset(chartRight, y),
+            strokeWidth = 1.dp.toPx()
+        )
+    }
+}
+
+private fun DrawScope.drawTopMomentumMountains(
+    chartLeft: Float,
+    chartWidth: Float,
+    baselineY: Float,
+    topPeaks: List<Int>
+) {
+    val segmentWidth = chartWidth / 6f
+    val barWidth = segmentWidth / 9f
+
+    topPeaks.forEachIndexed { i, peakBars ->
+        val startX = chartLeft + i * (segmentWidth * 1.35f)
+        for (b in 0 until peakBars) {
+            val centerIndex = peakBars / 2f
+            val distance = kotlin.math.abs(b - centerIndex)
+            val normalized = 1f - (distance / (centerIndex + 0.5f))
+            val barHeight = 24.dp.toPx() + normalized * 78.dp.toPx()
+
+            val x = startX + b * (barWidth * 0.92f)
+            drawRect(
+                brush = Brush.verticalGradient(listOf(CyanTop, CyanBottom)),
+                topLeft = Offset(x, baselineY - barHeight),
+                size = Size(barWidth, barHeight)
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawBottomDips(
+    chartLeft: Float,
+    chartWidth: Float,
+    baselineY: Float,
+    bottomDips: List<Int>
+) {
+    val positions = listOf(18f, 37f, 53f)
+    positions.forEachIndexed { i, minute ->
+        val dipBars = bottomDips.getOrElse(i) { 3 }
+        val centerX = minuteToX(minute, chartLeft, chartWidth, 90)
+        val barWidth = 6.dp.toPx()
+
+        for (b in 0 until dipBars) {
+            val offsetIndex = b - dipBars / 2f
+            val height = (10.dp.toPx() + (dipBars - kotlin.math.abs(offsetIndex)) * 5.dp.toPx())
+            drawRect(
+                color = DipColor,
+                topLeft = Offset(centerX + offsetIndex * barWidth, baselineY),
+                size = Size(barWidth - 1.dp.toPx(), height)
+            )
+        }
+    }
+}
+
+private fun minuteToX(
+    minute: Float,
+    chartLeft: Float,
+    chartWidth: Float,
+    maxMinute: Int
+): Float {
+    return chartLeft + (minute / maxMinute) * chartWidth
+}
+
+private fun sampleMomentumEvents(): List<MomentumEvent> = listOf(
+    MomentumEvent(2, Side.BOTTOM, 1, EventType.GOAL),
+    MomentumEvent(7, Side.TOP, 1, EventType.GOAL),
+    MomentumEvent(18, Side.BOTTOM, 1, EventType.GOAL),
+    MomentumEvent(35, Side.TOP, 2, EventType.GOAL),
+    MomentumEvent(37, Side.TOP, 1, EventType.CARD),
+    MomentumEvent(44, Side.TOP, 3, EventType.GOAL, "+2"),
+    MomentumEvent(55, Side.BOTTOM, 2, EventType.VAR),
+    MomentumEvent(60, Side.TOP, 2, EventType.GOAL),
+    MomentumEvent(61, Side.TOP, 3, EventType.VAR),
+    MomentumEvent(66, Side.TOP, 1, EventType.CARD)
+)
+
+/**
+ * Tiny helper so the snippet compiles without needing RowScope padding helpers.
+ */
+private fun Modifier.paddingHorizontalSafe(horizontal: Dp, vertical: Dp): Modifier =
+    this.then(
+        Modifier
+            .clip(RoundedCornerShape(0.dp))
+            .background(Color.Transparent)
+            .then(
+                androidx.compose.foundation.layout.padding(
+                    horizontal = horizontal,
+                    vertical = vertical
+                )
+            )
+    )
+
+
+@Composable
+fun MomentumChartPreviewBlock() {
+    Box(
+        modifier = Modifier
+            .width(360.dp)
+            .height(300.dp)
+            .background(Color(0xFF0E1437))
+    ) {
+        MomentumChart(
+            modifier = Modifier
+                .fillMaxSize()
+        )
+    }
+}
