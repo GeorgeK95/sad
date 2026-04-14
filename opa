@@ -1,3 +1,70 @@
+@Preview(showBackground = true, backgroundColor = 0xFFFFFFFF)
+@Composable
+private fun MomentumChartContainerPreview() {
+    MaterialTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(24.dp)
+        ) {
+            MomentumChartContainer(
+                badgePainter = painterResource(id = R.drawable.ic_team_napoli),
+                minuteLabel = "15'",
+                cardHeight = 250.dp,
+                badgeSize = 52.dp,
+                contentPadding = PaddingValues(
+                    start = 12.dp,
+                    top = 32.dp,
+                    end = 12.dp,
+                    bottom = 12.dp
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF1C234D))
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0E1437)
+@Composable
+private fun MomentumChartContainerDarkPreview() {
+    MaterialTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF0E1437))
+                .padding(24.dp)
+        ) {
+            MomentumChartContainer(
+                badgePainter = painterResource(id = R.drawable.ic_team_napoli),
+                minuteLabel = "68'",
+                cardHeight = 260.dp,
+                badgeSize = 56.dp,
+                contentPadding = PaddingValues(
+                    start = 14.dp,
+                    top = 34.dp,
+                    end = 14.dp,
+                    bottom = 14.dp
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF1A214D))
+                )
+            }
+        }
+    }
+}
+
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
