@@ -1,0 +1,269 @@
+@Composable
+fun MomentumChart(
+    modifier: Modifier = Modifier,
+    timeLabels: List<String>,
+    currentMinute: Int = 0,
+    momentumEvents: List<MomentumEvent> = emptyList(),
+    minuteValues: Map<Int, Float> = emptyMap(),
+    lineColor: Color = FollowScoresTheme.colors.contentVariant,
+    lineWidth: Float = 2f,
+    textColor: Color = FollowScoresTheme.colors.contentVariant,
+    textSize: Float = 32f,
+    currentMinuteColor: Color = FollowScoresTheme.colors.contentDark,
+    currentMinuteIndicatorColor: Color = FollowScoresTheme.colors.primary,
+    connectionLineLength: Float = 50F,
+    connectionLineColor: Color = FollowScoresTheme.colors.contentVariant,
+    addedTimeBlurColor: Color = FollowScoresTheme.colors.contentVariant.copy(alpha = 0.2f),
+    momentumLineColor: Color = Color(0xFFFFC107),
+    momentumLineWidth: Float = 4f,
+    onEventClick: (MomentumEvent) -> Unit = {},
+    onDismiss: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val iconPositions = remember { mutableStateMapOf<MomentumEvent, Rect>() }
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .padding(vertical = 10.dp)
+            .pointerInput(momentumEvents) {
+                detectTapGestures { offset ->
+                    var iconClicked = false
+                    iconPositions.forEach { (event, rect) ->
+                        if (rect.contains(offset)) {
+                            onEventClick(event)
+                            iconClicked = true
+                            return@forEach
+                        }
+                    }
+                    if (!iconClicked) {
+                        onDismiss()
+                    }
+                }
+            }
+    ) {
+        val canvasWidth = size.width
+        val canvasHeight = size.height
+
+        val maxMinutes = if (timeLabels.isNotEmpty()) {
+            timeLabels.last().replace("'", "").toIntOrNull() ?: 90
+        } else {
+            90
+        }
+
+        val clampedCurrentMinute = currentMinute.coerceIn(0, maxMinutes)
+
+        iconPositions.clear()
+
+        val horizontalSpacing = canvasHeight / 4f
+        val middleY = 2 * horizontalSpacing
+        val maxBarHeight = horizontalSpacing * 2f
+
+        val textPaint = Paint().apply {
+            color = textColor.toArgb()
+            textAlign = Paint.Align.CENTER
+            this.textSize = textSize
+            isFakeBoldText = true
+        }
+
+        val minuteTextPaint = Paint().apply {
+            color = currentMinuteColor.toArgb()
+            textAlign = Paint.Align.CENTER
+            this.textSize = 24f
+            isFakeBoldText = true
+        }
+
+        fun minuteToX(minute: Int): Float {
+            return (minute / maxMinutes.toFloat()) * canvasWidth
+        }
+
+        // 1) Draw vertical time lines + top labels
+        timeLabels.forEach { label ->
+            val minute = label.replace("'", "").toIntOrNull()
+            if (minute != null) {
+                val x = minuteToX(minute)
+
+                drawLine(
+                    color = lineColor,
+                    start = Offset(x, 0f),
+                    end = Offset(x, canvasHeight),
+                    strokeWidth = lineWidth
+                )
+
+                drawContext.canvas.nativeCanvas.drawText(
+                    label,
+                    x,
+                    -10f,
+                    textPaint
+                )
+            }
+        }
+
+        // 2) Draw horizontal lines
+        for (i in 0..4) {
+            val y = i * horizontalSpacing
+            val isMiddleLine = i == 2
+
+            drawLine(
+                color = lineColor,
+                start = Offset(0f, y),
+                end = Offset(canvasWidth, y),
+                strokeWidth = if (isMiddleLine) lineWidth * 3f else lineWidth
+            )
+        }
+
+        // 3) Draw momentum line
+        drawMomentumProgressLine(
+            minuteValues = minuteValues,
+            currentMinute = clampedCurrentMinute,
+            maxMinutes = maxMinutes,
+            canvasWidth = canvasWidth,
+            middleY = middleY,
+            maxBarHeight = maxBarHeight,
+            lineColor = momentumLineColor,
+            lineWidthPx = with(density) { momentumLineWidth.dp.toPx() }
+        )
+
+        // 4) Draw events on top of the line
+        drawMomentumEvents(
+            context = context,
+            momentumEvents = momentumEvents,
+            maxMinutes = maxMinutes,
+            canvasWidth = canvasWidth,
+            minuteValues = minuteValues,
+            maxBarHeight = maxBarHeight,
+            middleY = middleY,
+            connectionLineLength = connectionLineLength,
+            connectionLineColor = connectionLineColor,
+            lineWidth = lineWidth,
+            iconPositions = iconPositions,
+            textColor = textColor
+        )
+
+        // 5) Draw HT below 45'
+        val htMinute = 45
+        if (htMinute <= maxMinutes) {
+            val htX = minuteToX(htMinute)
+            drawContext.canvas.nativeCanvas.drawText(
+                "HT",
+                htX,
+                canvasHeight + textSize + 10f,
+                textPaint
+            )
+        }
+
+        // 6) Draw current minute indicator
+        val currentX = minuteToX(clampedCurrentMinute)
+
+        drawLine(
+            color = currentMinuteIndicatorColor,
+            start = Offset(currentX, 0f),
+            end = Offset(currentX, canvasHeight),
+            strokeWidth = lineWidth * 2f
+        )
+
+        val boxWidth = 60f
+        val boxHeight = 40f
+        val boxTop = -40f
+        val cornerRadius = 8.dp.toPx()
+
+        drawRoundRect(
+            color = currentMinuteIndicatorColor,
+            topLeft = Offset(currentX - boxWidth / 2f, boxTop),
+            size = Size(boxWidth, boxHeight),
+            cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+        )
+
+        drawContext.canvas.nativeCanvas.drawText(
+            "$clampedCurrentMinute '",
+            currentX,
+            boxTop + boxHeight / 2f + 8f,
+            minuteTextPaint
+        )
+    }
+}
+
+private fun DrawScope.drawMomentumProgressLine(
+    minuteValues: Map<Int, Float>,
+    currentMinute: Int,
+    maxMinutes: Int,
+    canvasWidth: Float,
+    middleY: Float,
+    maxBarHeight: Float,
+    lineColor: Color,
+    lineWidthPx: Float
+) {
+    if (minuteValues.isEmpty()) return
+
+    val visibleEntries = minuteValues
+        .toSortedMap()
+        .filterKeys { it in 0..currentMinute }
+
+    if (visibleEntries.isEmpty()) return
+
+    val maxAbsValue = visibleEntries.values
+        .maxOfOrNull { kotlin.math.abs(it) }
+        ?.takeIf { it > 0f }
+        ?: 1f
+
+    fun minuteToX(minute: Int): Float {
+        return (minute / maxMinutes.toFloat()) * canvasWidth
+    }
+
+    fun valueToY(value: Float): Float {
+        val normalized = (value / maxAbsValue).coerceIn(-1f, 1f)
+        return middleY - (normalized * maxBarHeight)
+    }
+
+    val sortedPoints = visibleEntries.map { (minute, value) ->
+        Offset(
+            x = minuteToX(minute),
+            y = valueToY(value)
+        )
+    }
+
+    if (sortedPoints.isEmpty()) return
+
+    if (sortedPoints.size == 1) {
+        drawCircle(
+            color = lineColor,
+            radius = lineWidthPx,
+            center = sortedPoints.first()
+        )
+        return
+    }
+
+    val path = Path().apply {
+        moveTo(sortedPoints.first().x, sortedPoints.first().y)
+
+        for (i in 1 until sortedPoints.size) {
+            val previous = sortedPoints[i - 1]
+            val current = sortedPoints[i]
+
+            val midX = (previous.x + current.x) / 2f
+            val midY = (previous.y + current.y) / 2f
+
+            quadraticBezierTo(
+                previous.x,
+                previous.y,
+                midX,
+                midY
+            )
+        }
+
+        val last = sortedPoints.last()
+        lineTo(last.x, last.y)
+    }
+
+    drawPath(
+        path = path,
+        color = lineColor,
+        style = Stroke(
+            width = lineWidthPx,
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round
+        )
+    )
+}
